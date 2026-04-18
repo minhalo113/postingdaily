@@ -33,29 +33,29 @@ def main():
     image_output_path = "final_output.png"
     create_final_image(pixabay_img, summary, image_output_path)
 
-    # video_output_path = "final_output.mp4"
-    # success = create_video_from_image(image_output_path, video_output_path, duration=15)
+    video_output_path = "final_output.mp4"
+    success = create_video_from_image(image_output_path, video_output_path, duration=15)
     
-    # if success:
-    #     caption = description
+    if success:
+        caption = description
         
-    #     try:
-    #         post_to_meta(image_output_path, caption)
-    #     except Exception as e:
-    #         print(f"Unexpected error posting to Meta (Facebook/Instagram): {e}")
+        try:
+            post_to_meta(image_output_path, caption)
+        except Exception as e:
+            print(f"Unexpected error posting to Meta (Facebook/Instagram): {e}")
             
-    #     # try:
-    #     #     post_to_x(image_output_path, caption)
-    #     # except Exception as e:
-    #     #     print(f"Unexpected error posting to X: {e}")
+        # try:
+        #     post_to_x(image_output_path, caption)
+        # except Exception as e:
+        #     print(f"Unexpected error posting to X: {e}")
             
-    #     try:
-    #         post_to_youtube(video_output_path, title, description)
-    #     except Exception as e:
-    #         print(f"Unexpected error posting to YouTube: {e}")
+        try:
+            post_to_youtube(video_output_path, title, description)
+        except Exception as e:
+            print(f"Unexpected error posting to YouTube: {e}")
             
-    # else:
-    #     print("Video generation failed. Skipping social posting.")
+    else:
+        print("Video generation failed. Skipping social posting.")
 
 if __name__ == "__main__":
     main()
