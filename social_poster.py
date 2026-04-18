@@ -105,39 +105,39 @@ def post_to_meta(image_path, caption):
             if 'fb_response' in locals():
                 print(fb_response.text)
             
-        # try:
-        #     instagram_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{instagram_business_id}/media"
-        #     instagram_params = {
-        #         'access_token': access_token,
-        #         'image_url': image_url,
-        #         'caption': caption
-        #     }
-        #     ig_response = requests.post(instagram_endpoint, data=instagram_params)
-        #     ig_response.raise_for_status()
-        #     media_data = ig_response.json()
-        #     creation_id = media_data.get('id')
+        try:
+            instagram_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{instagram_business_id}/media"
+            instagram_params = {
+                'access_token': access_token,
+                'image_url': image_url,
+                'caption': caption
+            }
+            ig_response = requests.post(instagram_endpoint, data=instagram_params)
+            ig_response.raise_for_status()
+            media_data = ig_response.json()
+            creation_id = media_data.get('id')
             
-        #     if not creation_id:
-        #         raise Exception("Failed to create Instagram media container")
+            if not creation_id:
+                raise Exception("Failed to create Instagram media container")
                 
-        #     ready = wait_for_ig_container_ready(creation_id, access_token)
-        #     if not ready.get('ok'):
-        #         diag = json.dumps(ready.get('diag', {}))
-        #         error_msg = ready.get('error')
-        #         raise Exception(f"Instagram container not publishable: {ready.get('status')}. {error_msg} diag={diag}")
+            ready = wait_for_ig_container_ready(creation_id, access_token)
+            if not ready.get('ok'):
+                diag = json.dumps(ready.get('diag', {}))
+                error_msg = ready.get('error')
+                raise Exception(f"Instagram container not publishable: {ready.get('status')}. {error_msg} diag={diag}")
                 
-        #     publish_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{instagram_business_id}/media_publish"
-        #     publish_params = {
-        #         'access_token': access_token,
-        #         'creation_id': creation_id
-        #     }
-        #     pub_response = requests.post(publish_endpoint, data=publish_params)
-        #     pub_response.raise_for_status()
-        #     print("posted to Instagram!")
-        # except Exception as e:
-        #     print(f"error for instagram: {e}")
-        #     if 'pub_response' in locals():
-        #         print(pub_response.text)
+            publish_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{instagram_business_id}/media_publish"
+            publish_params = {
+                'access_token': access_token,
+                'creation_id': creation_id
+            }
+            pub_response = requests.post(publish_endpoint, data=publish_params)
+            pub_response.raise_for_status()
+            print("posted to Instagram!")
+        except Exception as e:
+            print(f"error for instagram: {e}")
+            if 'pub_response' in locals():
+                print(pub_response.text)
             
         return True
             
