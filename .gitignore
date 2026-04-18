@@ -3,6 +3,5 @@ __pycache__/
 *.pyc
 final_output.png
 final_output.mp4
-music/*
+
 .venv/
-logo.png
