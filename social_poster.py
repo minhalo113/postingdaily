@@ -4,6 +4,9 @@ import json
 import tweepy
 from dotenv import load_dotenv
 import time
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 load_dotenv()
 
@@ -101,6 +104,7 @@ def post_to_meta(video_path, caption):
             print("Successfully published to Facebook!")
         except Exception as e:
             print(f"Failed to publish to Facebook: {e}")
+            print(fb_response)
             
         print("Publishing to Instagram...")
         try:
@@ -135,6 +139,7 @@ def post_to_meta(video_path, caption):
             print("Successfully published to Instagram!")
         except Exception as e:
             print(f"Failed to publish to Instagram: {e}")
+            print(pub_response)
             
         return True
             
@@ -187,4 +192,54 @@ def post_to_x(video_path, caption):
         return True
     except Exception as e:
         print(f"Failed to post to X: {e}")
+        return False
+
+
+def post_to_youtube(video_path, title, description):
+    print("--- Posting to YouTube ---")
+    client_id = os.getenv("YOUTUBE_CLIENT_ID")
+    client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+    refresh_token = os.getenv("YOUTUBE_REFRESH_TOKEN")
+
+    if not all([client_id, client_secret, refresh_token]):
+        print("YouTube credentials missing. Skipping YouTube.")
+        return False
+
+    try:
+        credentials = Credentials(
+            None,
+            client_id=client_id,
+            client_secret=client_secret,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token"
+        )
+        
+        youtube = build("youtube", "v3", credentials=credentials)
+        
+        body = {
+            "snippet": {
+                "title": title,
+                "description": description,
+                "categoryId": "25" # News & Politics
+            },
+            "status": {
+                "privacyStatus": "public",
+                "selfDeclaredMadeForKids": False
+            }
+        }
+        
+        print(f"Uploading {video_path} to YouTube as '{title}'...")
+        media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
+        request = youtube.videos().insert(
+            part="snippet,status",
+            body=body,
+            media_body=media
+        )
+        
+        response = request.execute()
+        print(f"Successfully posted to YouTube! Video ID: {response.get('id')}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to post to YouTube: {e}")
         return False
