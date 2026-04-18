@@ -76,8 +76,8 @@ def create_final_image(pixabay_img, summary_text, output_path="final_output.png"
     
     draw = ImageDraw.Draw(final_img)
 
-    font_large_path = "C:\\Windows\\Fonts\\arialbd.ttf"
-    font_small_path = "C:\\Windows\\Fonts\\arial.ttf"
+    font_large_path = "assets/arialbd.ttf"
+    font_small_path = "assets/arial.ttf"
     try:
         font_large = ImageFont.truetype(font_large_path, 60)
         font_small = ImageFont.truetype(font_small_path, 40)
