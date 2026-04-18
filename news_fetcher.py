@@ -2,6 +2,7 @@ import os
 import requests
 from dotenv import load_dotenv
 import json
+import httpx
 
 load_dotenv()
 
@@ -38,7 +39,11 @@ def summarize_and_extract_keywords(news_text, model_name="gpt-5-nano"):
         }
 
     from openai import OpenAI
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key
+    , http_client=httpx.Client(
+        proxy=None,       
+        trust_env=False   
+    ))
 
     prompt = (
         f"Here is a news headline/description:\n'{news_text}'\n\n"

@@ -2,6 +2,10 @@ import os
 from news_fetcher import fetch_top_news, summarize_and_extract_keywords
 from image_processor import fetch_pixabay_image, create_final_image
 from video_generator import create_video_from_image
+from social_poster import post_to_meta, post_to_x
+
+
+import os
 
 def main():
     print("--- 1. Fetching Top News ---")
@@ -35,10 +39,26 @@ def main():
     success = create_video_from_image(image_output_path, video_output_path, duration=15)
     
     if success:
-        print(f"\n✅ Pipeline Complete!")
+        print(f"\n✅ Video Generation Complete!")
         print(f"Check {image_output_path} and {video_output_path}")
+        
+        print("\n--- 5. Posting to Social Media ---")
+        caption = summary
+        
+        try:
+            post_to_meta(video_output_path, caption)
+        except Exception as e:
+            print(f"Unexpected error posting to Meta (Facebook/Instagram): {e}")
+            
+        try:
+            post_to_x(video_output_path, caption)
+        except Exception as e:
+            print(f"Unexpected error posting to X: {e}")
+            
+        print("\n✅ Pipeline Fully Complete!")
+            
     else:
-        print("\n❌ Video generation failed.")
+        print("\n❌ Video generation failed. Skipping social posting.")
 
 if __name__ == "__main__":
     main()
