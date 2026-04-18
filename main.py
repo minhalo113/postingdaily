@@ -44,10 +44,10 @@ def main():
         except Exception as e:
             print(f"Unexpected error posting to Meta (Facebook/Instagram): {e}")
             
-        try:
-            post_to_x(image_output_path, caption)
-        except Exception as e:
-            print(f"Unexpected error posting to X: {e}")
+        # try:
+        #     # post_to_x(image_output_path, caption)
+        # except Exception as e:
+        #     print(f"Unexpected error posting to X: {e}")
             
         try:
             post_to_youtube(video_output_path, title, description)
