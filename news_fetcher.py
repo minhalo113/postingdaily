@@ -15,11 +15,32 @@ def fetch_top_news():
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
+        
+        posted_file = "posted_news.txt"
+        posted_urls = []
+        if os.path.exists(posted_file):
+            with open(posted_file, "r") as f:
+                posted_urls = [line.strip() for line in f if line.strip()]
+
         if data.get("articles") and len(data["articles"]) > 0:
-            article = data["articles"][0]
-            title = article.get("title", "")
-            description = article.get("description", "")
-            return f"{title}. {description}"
+            for article in data["articles"]:
+                article_url = article.get("url")
+                if article_url and article_url not in posted_urls:
+                    title = article.get("title", "")
+                    description = article.get("description", "")
+                    
+                    posted_urls.append(article_url)
+                    if len(posted_urls) > 100:
+                        posted_urls = posted_urls[-100:]
+                        
+                    with open(posted_file, "w") as f:
+                        for p_url in posted_urls:
+                            f.write(f"{p_url}\n")
+                            
+                    return f"{title}. {description}"
+            
+            print("no news to post")
+            return ""
         else:
             print(data)
         return ""
@@ -30,16 +51,6 @@ def fetch_top_news():
 def summarize_and_extract_keywords(news_text, model_name="gpt-5-nano"):
     api_key = os.getenv("OPENAI_API_KEY")
     
-    if not api_key or api_key == "your_openai_api_key_here":
-        # Mock response for testing
-        print("[MOCK] Summarizing news and extracting keywords...")
-        return {
-            "summary": "AI has achieved a major breakthrough, enabling robots to autonomously write flawless code and boost global productivity.",
-            "keyword": "robot coding",
-            "title": "Robots Are Now Writing Code! 🤖💻",
-            "description": "AI has achieved a major breakthrough! Robots are now autonomously writing flawless code, significantly boosting global productivity. Check out the future of software development! #AI #Robotics #Coding #TechNews"
-        }
-
     from openai import OpenAI
     client = OpenAI(api_key=api_key
     , http_client=httpx.Client(

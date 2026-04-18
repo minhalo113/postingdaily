@@ -119,7 +119,6 @@ def create_final_image(pixabay_img, summary_text, output_path="final_output.png"
         print(f"Error placing logo: {e}")
             
     final_img.save(output_path)
-    print(f"Saved final image to {output_path}")
     return output_path
 
 if __name__ == "__main__":

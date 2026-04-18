@@ -6,8 +6,7 @@ def create_video_from_image(image_path, output_path = "final_output.mp4", durati
     if not os.path.exists(image_path):
         print(f"Error: Image {image_path} not found")
         return False
-    
-    print(f"Creating {duration}-second video from {image_path}...")
+
 
     image_clip = ImageClip(image_path).with_duration(duration)
 
@@ -19,7 +18,7 @@ def create_video_from_image(image_path, output_path = "final_output.mp4", durati
         if music_files:
             selected_music = random.choice(music_files)
             music_path = os.path.join(music_dir, selected_music)
-            print(f"Selected background music: {music_path}")
+            print(f"background music: {music_path}")
 
             try:
                 raw_audio = AudioFileClip(music_path)
@@ -28,16 +27,17 @@ def create_video_from_image(image_path, output_path = "final_output.mp4", durati
                 else:
                     audio_clip = raw_audio
             except Exception as e:
-                print(f"Error processing audio file {music_path}: {e}")
+                print(f"error for audio: {e}")
         else:
-            print(f"No audio files found in {music_dir}/")
+            print(f"no audio files in {music_dir}/")
     else:
-        print(f"Music directory {music_dir}/ not found.")
+        print(f"music directory {music_dir}/ not found.")
 
     if audio_clip:
         from moviepy.audio.fx.AudioFadeOut import AudioFadeOut
+        from moviepy.audio.fx.MultiplyVolume import MultiplyVolume  
 
-        audio_clip = audio_clip.with_effects([AudioFadeOut(2)])
+        audio_clip = audio_clip.with_effects([MultiplyVolume(0.1), AudioFadeOut(2)])
         image_clip = image_clip.with_audio(audio_clip)
 
     try:
@@ -48,10 +48,10 @@ def create_video_from_image(image_path, output_path = "final_output.mp4", durati
             audio_codec = "aac",
             preset = "ultrafast"
         )
-        print(f"Successfully generated video: {output_path}")
+        print(f"video created: {output_path}")
         return True
     except Exception as e:
-        print(f"Error generating video: {e}")
+        print(f"error for video: {e}")
         return False
 
 if __name__ == "__main__":

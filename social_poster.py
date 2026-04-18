@@ -4,6 +4,9 @@ import json
 import tweepy
 from dotenv import load_dotenv
 import time
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -17,27 +20,22 @@ def ensure_env(value, name):
         raise ValueError(f"{name} is not configured")
     return value
 
-def create_public_server(video_path):
-    print("Uploading media to Imgur...")
-    imgur_client_id = ensure_env(os.getenv("IMGUR_CLIENT_ID"), "IMGUR_CLIENT_ID")
-    url = "https://api.imgur.com/3/image"
-    headers = {"Authorization": f"Client-ID {imgur_client_id}"}
-    
+def upload_to_cloudinary(image_path):
     try:
-        with open(video_path, "rb") as video_file:
-            files = {"image": video_file}
-            response = requests.post(url, headers=headers, files=files)
-            
-        if response.status_code == 200:
-            video_url = response.json()["data"]["link"]
-            print(f"Media uploaded successfully to Imgur. URL: {video_url}")
-            return video_url
-        else:
-            print(f"Error uploading media to Imgur: {response.status_code}, {response.text}")
-            return None
+        cloudinary.config(
+            cloud_name=ensure_env(os.getenv("CLOUDINARY_CLOUD_NAME"), "CLOUDINARY_CLOUD_NAME"),
+            api_key=ensure_env(os.getenv("CLOUDINARY_API_KEY"), "CLOUDINARY_API_KEY"),
+            api_secret=ensure_env(os.getenv("CLOUDINARY_API_SECRET"), "CLOUDINARY_API_SECRET")
+        )
+        
+        response = cloudinary.uploader.upload(image_path)
+        image_url = response.get("secure_url")
+        public_id = response.get("public_id")
+        
+        return image_url, public_id
     except Exception as e:
-        print(f"An error occurred during Imgur upload: {e}")
-        return None
+        print(f"error for cloudinary upload: {e}")
+        return None, None
 
 def wait_for_ig_container_ready(creation_id, access_token, max_wait_ms=900000, poll_interval_ms=5000):
     endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{creation_id}"
@@ -49,7 +47,6 @@ def wait_for_ig_container_ready(creation_id, access_token, max_wait_ms=900000, p
             response.raise_for_status()
             data = response.json()
             status = data.get('status_code')
-            print(f"Instagram container status: {status}")
             
             if status == 'FINISHED':
                 return {'ok': True, 'status': status, 'diag': data}
@@ -76,8 +73,7 @@ def wait_for_ig_container_ready(creation_id, access_token, max_wait_ms=900000, p
             status_code = err.response.status_code if err.response else '??'
             raise Exception(f"Polling failed (HTTP {status_code}): {msg}")
 
-def post_to_meta(video_path, caption):
-    print("--- Posting to Meta (Facebook & Instagram) ---")
+def post_to_meta(image_path, caption):
     try:
         access_token = ensure_env(os.getenv("META_ACCESS_TOKEN"), "META_ACCESS_TOKEN")
         facebook_page_id = ensure_env(os.getenv("META_FACEBOOK_PAGE_ID"), "META_FACEBOOK_PAGE_ID")
@@ -86,33 +82,34 @@ def post_to_meta(video_path, caption):
         print(f"Meta credentials missing: {e}. Skipping Meta.")
         return False
         
+    public_id_to_delete = None
     try:
-        video_url = create_public_server(video_path)
-        if not video_url:
-            raise Exception("Failed to get public URL from Imgur upload")
+        image_url, public_id = upload_to_cloudinary(image_path)
+        if not image_url:
+            raise Exception("Failed to get public URL from Cloudinary upload")
+            
+        public_id_to_delete = public_id
         
-        print("Publishing to Facebook...")
         try:
-            facebook_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{facebook_page_id}/videos"
+            facebook_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{facebook_page_id}/photos"
             facebook_params = {
                 'access_token': access_token,
-                'file_url': video_url,
-                'description': caption
+                'url': image_url,
+                'message': caption
             }
             fb_response = requests.post(facebook_endpoint, data=facebook_params)
             fb_response.raise_for_status()
-            print("Successfully published to Facebook!")
+            print("posted to facebook")
         except Exception as e:
-            print(f"Failed to publish to Facebook: {e}")
-            print(fb_response)
+            print(f"error for facebook: {e}")
+            if 'fb_response' in locals():
+                print(fb_response.text)
             
-        print("Publishing to Instagram...")
         try:
             instagram_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{instagram_business_id}/media"
             instagram_params = {
                 'access_token': access_token,
-                'media_type': 'REELS',
-                'video_url': video_url,
+                'image_url': image_url,
                 'caption': caption
             }
             ig_response = requests.post(instagram_endpoint, data=instagram_params)
@@ -136,48 +133,40 @@ def post_to_meta(video_path, caption):
             }
             pub_response = requests.post(publish_endpoint, data=publish_params)
             pub_response.raise_for_status()
-            print("Successfully published to Instagram!")
+            print("posted to Instagram!")
         except Exception as e:
-            print(f"Failed to publish to Instagram: {e}")
-            print(pub_response)
+            print(f"error for instagram: {e}")
+            if 'pub_response' in locals():
+                print(pub_response.text)
             
         return True
             
     except Exception as e:
-        print(f"Error in Meta posting pipeline: {e}")
+        print(f"error for meta: {e}")
         return False
+    finally:
+        if public_id_to_delete:
+            try:
+                cloudinary.uploader.destroy(public_id_to_delete)
+                print("deleted from cloudinary")
+            except Exception as e:
+                print(f"error for cloudinary delete: {e}")
 
-def post_to_x(video_path, caption):
-    print("--- Posting to X (Twitter) ---")
+def post_to_x(image_path, caption):
     api_key = os.getenv("X_API_KEY")
     api_secret = os.getenv("X_API_SECRET")
     access_token = os.getenv("X_ACCESS_TOKEN")
     access_secret = os.getenv("X_ACCESS_SECRET")
     
     if not all([api_key, api_secret, access_token, access_secret]):
-        print("X (Twitter) credentials missing. Skipping X.")
+        print("error for x: missing credentials")
         return False
         
     try:
         auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_token, access_secret)
         api = tweepy.API(auth)
         
-        print("Uploading media to X...")
-        media = api.media_upload(video_path, media_category="tweet_video", chunked=True)
-        
-        processing_info = media.processing_info
-        while processing_info and (processing_info['state'] == 'pending' or processing_info['state'] == 'in_progress'):
-            check_after_secs = processing_info.get('check_after_secs', 5)
-            print(f"X media processing... waiting {check_after_secs}s")
-            time.sleep(check_after_secs)
-            media_status = api.get_media_upload_status(media.media_id)
-            processing_info = media_status.processing_info
-            
-            if processing_info['state'] == 'failed':
-                print(f"X media processing failed: {processing_info}")
-                return False
-            if processing_info['state'] == 'succeeded':
-                break
+        media = api.media_upload(image_path)
 
         client = tweepy.Client(
             consumer_key=api_key,
@@ -186,23 +175,21 @@ def post_to_x(video_path, caption):
             access_token_secret=access_secret
         )
         
-        print("Creating tweet...")
         client.create_tweet(text=caption, media_ids=[media.media_id])
-        print("Successfully posted to X!")
+        print("posted to x")
         return True
     except Exception as e:
-        print(f"Failed to post to X: {e}")
+        print(f"error for x: {e}")
         return False
 
 
 def post_to_youtube(video_path, title, description):
-    print("--- Posting to YouTube ---")
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
     refresh_token = os.getenv("YOUTUBE_REFRESH_TOKEN")
 
     if not all([client_id, client_secret, refresh_token]):
-        print("YouTube credentials missing. Skipping YouTube.")
+        print("error for youtube: missing credentials")
         return False
 
     try:
@@ -228,7 +215,6 @@ def post_to_youtube(video_path, title, description):
             }
         }
         
-        print(f"Uploading {video_path} to YouTube as '{title}'...")
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
         request = youtube.videos().insert(
             part="snippet,status",
@@ -237,9 +223,9 @@ def post_to_youtube(video_path, title, description):
         )
         
         response = request.execute()
-        print(f"Successfully posted to YouTube! Video ID: {response.get('id')}")
+        print(f"posted to youtube")
         return True
         
     except Exception as e:
-        print(f"Failed to post to YouTube: {e}")
+        print(f"error for youtube: {e}")
         return False
