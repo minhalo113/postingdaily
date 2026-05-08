@@ -20,7 +20,7 @@ def ensure_env(value, name):
         raise ValueError(f"{name} is not configured")
     return value
 
-def upload_to_cloudinary(image_path):
+def upload_to_cloudinary(file_path):
     try:
         cloudinary.config(
             cloud_name=ensure_env(os.getenv("CLOUDINARY_CLOUD_NAME"), "CLOUDINARY_CLOUD_NAME"),
@@ -28,14 +28,15 @@ def upload_to_cloudinary(image_path):
             api_secret=ensure_env(os.getenv("CLOUDINARY_API_SECRET"), "CLOUDINARY_API_SECRET")
         )
         
-        response = cloudinary.uploader.upload(image_path)
-        image_url = response.get("secure_url")
+        response = cloudinary.uploader.upload(file_path, resource_type="auto")
+        file_url = response.get("secure_url")
         public_id = response.get("public_id")
+        resource_type = response.get("resource_type", "image")
         
-        return image_url, public_id
+        return file_url, public_id, resource_type
     except Exception as e:
         print(f"error for cloudinary upload: {e}")
-        return None, None
+        return None, None, None
 
 def wait_for_ig_container_ready(creation_id, access_token, max_wait_ms=900000, poll_interval_ms=5000):
     endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{creation_id}"
@@ -73,7 +74,7 @@ def wait_for_ig_container_ready(creation_id, access_token, max_wait_ms=900000, p
             status_code = err.response.status_code if err.response else '??'
             raise Exception(f"Polling failed (HTTP {status_code}): {msg}")
 
-def post_to_meta(image_path, caption):
+def post_to_meta(image_path, video_path, caption):
     try:
         access_token = ensure_env(os.getenv("META_ACCESS_TOKEN"), "META_ACCESS_TOKEN")
         facebook_page_id = ensure_env(os.getenv("META_FACEBOOK_PAGE_ID"), "META_FACEBOOK_PAGE_ID")
@@ -82,13 +83,17 @@ def post_to_meta(image_path, caption):
         print(f"Meta credentials missing: {e}. Skipping Meta.")
         return False
         
-    public_id_to_delete = None
+    public_ids_to_delete = []
     try:
-        image_url, public_id = upload_to_cloudinary(image_path)
+        image_url, image_public_id, image_resource_type = upload_to_cloudinary(image_path)
         if not image_url:
-            raise Exception("Failed to get public URL from Cloudinary upload")
-            
-        public_id_to_delete = public_id
+            raise Exception("Failed to get public URL for image from Cloudinary upload")
+        public_ids_to_delete.append((image_public_id, image_resource_type))
+
+        video_url, video_public_id, video_resource_type = upload_to_cloudinary(video_path)
+        if not video_url:
+            raise Exception("Failed to get public URL for video from Cloudinary upload")
+        public_ids_to_delete.append((video_public_id, video_resource_type))
         
         try:
             facebook_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{facebook_page_id}/photos"
@@ -109,7 +114,8 @@ def post_to_meta(image_path, caption):
             instagram_endpoint = f"https://graph.facebook.com/{GRAPH_VERSION}/{instagram_business_id}/media"
             instagram_params = {
                 'access_token': access_token,
-                'image_url': image_url,
+                'video_url': video_url,
+                'media_type': 'REELS',
                 'caption': caption
             }
             ig_response = requests.post(instagram_endpoint, data=instagram_params)
@@ -145,12 +151,13 @@ def post_to_meta(image_path, caption):
         print(f"error for meta: {e}")
         return False
     finally:
-        if public_id_to_delete:
-            try:
-                cloudinary.uploader.destroy(public_id_to_delete)
-                print("deleted from cloudinary")
-            except Exception as e:
-                print(f"error for cloudinary delete: {e}")
+        for public_id, resource_type in public_ids_to_delete:
+            if public_id:
+                try:
+                    cloudinary.uploader.destroy(public_id, resource_type=resource_type)
+                    print(f"deleted {resource_type} from cloudinary")
+                except Exception as e:
+                    print(f"error for cloudinary delete ({resource_type}): {e}")
 
 def post_to_x(image_path, caption):
     api_key = os.getenv("X_API_KEY")

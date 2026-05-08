@@ -40,7 +40,7 @@ def main():
         caption = description
         
         try:
-            post_to_meta(image_output_path, caption)
+            post_to_meta(image_output_path, video_output_path, caption)
         except Exception as e:
             print(f"Unexpected error posting to Meta (Facebook/Instagram): {e}")
             
