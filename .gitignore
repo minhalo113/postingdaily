@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 final_output.png
 final_output.mp4
+posted_news.txt
 
 .venv/
